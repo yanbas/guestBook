@@ -3,6 +3,7 @@ package App
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -21,32 +22,33 @@ type App struct {
 func (a *App) Create(w http.ResponseWriter, r *http.Request) {
 	log.Println("Call Method Create...")
 
-	// err := json.NewDecoder(r.Body).Decode(&guest)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusBadRequest)
-	// 	return
-	// }
-
-	// loc, _ := time.LoadLocation("Asia/Jakarta")
-	// datee := "2010-01-23 11:44:20"
-	// dt, _ := time.Parse("2006-01-02 15:04:05", datee)
-	// dtstr2 := dt.Format("Jan 2 '06 at 15:04")
-	// guest.Tanggal = dt.In(loc)
-
-	// log.Println(guest)
-
 	var guest Guest
 
-	err := json.NewDecoder(r.Body).Decode(&guest)
+	req, _ := ioutil.ReadAll(r.Body)
+
+	err := json.Unmarshal(req, &guest)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	response := ResponseData{}
+
 	err = a.Insert(&guest)
 	if err != nil {
 		log.Println(err.Error)
+		w.WriteHeader(http.StatusInternalServerError)
+		response.Status = false
+		response.Message = "Error Push Data"
+		response.Code = 199
+
+		data, err := json.Marshal(response)
+		log.Println(err.Error())
+
+		w.Write(data)
 	}
+
+	w.WriteHeader(http.StatusCreated)
 }
 
 func (a *App) Show(w http.ResponseWriter, r *http.Request) {
