@@ -50,6 +50,7 @@ func main() {
 	app.CollectionBook = collection
 
 	route.HandleFunc("/guest", app.Create).Methods("POST")
+	route.HandleFunc("/guest/checkout", app.Checkout).Methods("POST")
 	route.HandleFunc("/guest", app.Show).Methods("GET")
 	route.HandleFunc("/guest/{id}", app.GetData).Methods("GET")
 

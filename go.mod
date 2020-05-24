@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/buger/jsonparser v1.0.0
+	github.com/go-acme/lego v2.7.2+incompatible
 	github.com/go-acme/lego/v3 v3.7.0
 	github.com/go-redis/redis v6.15.7+incompatible
 	github.com/gorilla/mux v1.7.4
