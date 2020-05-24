@@ -54,7 +54,7 @@ func (a *App) Create(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) Checkout(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-
+	w.Header().Add("Content-Type", "application/json")
 	checkout := Checkout{}
 	response := ResponseData{}
 
@@ -98,6 +98,21 @@ func (a *App) Checkout(w http.ResponseWriter, r *http.Request) {
 		response.Status = false
 		response.Message = "Error Checkout Data"
 		response.Code = 189
+
+		data, err := json.Marshal(response)
+		log.Println(err.Error())
+
+		w.Write(data)
+		return
+	}
+
+	err = a.Insert(&guest)
+	if err != nil {
+		log.Println(err.Error)
+		w.WriteHeader(http.StatusInternalServerError)
+		response.Status = false
+		response.Message = "Error Put Data"
+		response.Code = 176
 
 		data, err := json.Marshal(response)
 		log.Println(err.Error())
