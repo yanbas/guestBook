@@ -1,14 +1,16 @@
 package main
 
 import (
+	"context"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
 	App "guestBook/app"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/buger/jsonparser"
 	"github.com/go-redis/redis"
@@ -17,16 +19,35 @@ import (
 
 func main() {
 	route := mux.NewRouter()
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(os.Stdout)
+	log.SetReportCaller(true)
+	log.SetLevel(log.DebugLevel)
 
 	file, err := os.Open("./config/config.json")
 	if err != nil {
-		log.Println(err.Error())
+		log.Error("Error Open File, ", err.Error())
 	}
 
 	config, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Println(err.Error())
+		log.Error("Error Read File, ", err.Error())
 	}
+
+	//email initialize
+	sender, _ := jsonparser.GetString(config, "smtp", "user")
+	password, _ := jsonparser.GetString(config, "smtp", "password")
+	portMail, _ := jsonparser.GetString(config, "smtp", "port")
+	host, _ := jsonparser.GetString(config, "smtp", "host")
+	portMailer, _ := strconv.Atoi(portMail)
+
+	// Set Context For Mail
+	contextParent := context.Background()
+	ctxMail := context.WithValue(contextParent, "mailHost", host)
+	ctxMail = context.WithValue(ctxMail, "mailSender", sender)
+	ctxMail = context.WithValue(ctxMail, "mailPassword", password)
+	ctxMail = context.WithValue(ctxMail, "mailSender", sender)
+	ctxMail = context.WithValue(ctxMail, "mailPort", portMailer)
 
 	port, _ := jsonparser.GetString(config, "server", "port")
 	redisHost, _ := jsonparser.GetString(config, "redis", "server")
@@ -35,6 +56,8 @@ func main() {
 	db, _ := strconv.Atoi(redisDb)
 
 	app := App.App{}
+
+	app.Ctx = ctxMail
 
 	connRedis := redis.NewClient(&redis.Options{
 		Addr:     redisHost,
@@ -54,7 +77,7 @@ func main() {
 	route.HandleFunc("/guest", app.Show).Methods("GET")
 	route.HandleFunc("/guest/{id}", app.GetData).Methods("GET")
 
-	log.Println("running on port : ", port)
+	log.Info("Running On Port : ", port)
 	http.ListenAndServe(port, route)
 
 }

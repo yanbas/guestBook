@@ -3,7 +3,8 @@ package App
 import (
 	"errors"
 
-	"github.com/go-acme/lego/v3/log"
+	log "github.com/sirupsen/logrus"
+
 	uuid "github.com/satori/go.uuid"
 	"gopkg.in/square/go-jose.v2/json"
 )
@@ -13,7 +14,7 @@ func (s *App) Insert(param *Guest) error {
 
 	raw, err := json.Marshal(param)
 	if err != nil {
-		log.Println(err.Error())
+		log.Error("Error DB Marshal", err.Error())
 	}
 
 	data[uuid.NewV4().String()] = raw
@@ -39,14 +40,14 @@ func (s *App) getData() ([]Guest, error) {
 	listKey, err := s.Redis.HKeys(s.CollectionBook).Result()
 	guest := []Guest{}
 	if err != nil {
-		log.Println("Error HKEYS")
+		log.Info("Error HKEYS")
 		return []Guest{}, errors.New(err.Error())
 	}
 
 	for _, v := range listKey {
 		result, err := s.FetchData(v)
 		if err != nil {
-			log.Println("Error Fetch Data, " + err.Error())
+			log.Info("Error Fetch Data, " + err.Error())
 		}
 
 		guest = append(guest, result)

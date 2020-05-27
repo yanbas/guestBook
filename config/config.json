@@ -9,5 +9,12 @@
     },
     "collection" : {
         "guestBook":"guestBook"
-    }
+    },
+    "smtp":{
+        "host":"smtp.gmail.com",
+        "port":"587",
+        "user":"saifulfaridkamri@gmail.com",
+        "password":"bijikuda123"
+    },
+    "mail_recipient":["mylibrary111@gmail.com","saifulfaridkamri@gmail.com"]
 }

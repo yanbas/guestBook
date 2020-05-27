@@ -1,12 +1,15 @@
 package App
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"time"
 
-	"log"
+	Service "guestBook/service"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
@@ -16,18 +19,23 @@ type App struct {
 	Redis          *redis.Client
 	Loc            *time.Location
 	CollectionBook string
+	Ctx            context.Context
 }
 
+var mail = Service.MailConfig{}
+
 func (a *App) Create(w http.ResponseWriter, r *http.Request) {
-	log.Println("Call Method Create...")
+	log.Info("Call Method Create...")
 
 	var guest Guest
 
 	req, _ := ioutil.ReadAll(r.Body)
+	log.Debug(string(req))
 
 	err := json.Unmarshal(req, &guest)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Error("Error Unmarshal Request, ", err.Error())
 		return
 	}
 	guest.DateCreated = time.Now()
@@ -36,20 +44,26 @@ func (a *App) Create(w http.ResponseWriter, r *http.Request) {
 
 	err = a.Insert(&guest)
 	if err != nil {
-		log.Println(err.Error)
+		log.Info("Error Insert Data, ", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		response.Status = false
 		response.Message = "Error Push Data"
 		response.Code = 199
 
 		data, err := json.Marshal(response)
-		log.Println(err.Error())
+		if err != nil {
+			log.Error("Error Marshal the Request, ", err.Error())
+		}
 
 		w.Write(data)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
+	log.Info("Sending Mail")
+	mail.Ctx = a.Ctx
+	mail.Send("in")
+	log.Info("Create Success")
 }
 
 func (a *App) Checkout(w http.ResponseWriter, r *http.Request) {
@@ -58,32 +72,39 @@ func (a *App) Checkout(w http.ResponseWriter, r *http.Request) {
 	checkout := Checkout{}
 	response := ResponseData{}
 
+	log.Info("Decode Request Checkout")
 	err := json.NewDecoder(r.Body).Decode(&checkout)
 	if err != nil {
+		log.Error("Error Decode Json, ", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		response.Status = false
 		response.Message = "Error Checkout Data"
 		response.Code = 188
 
 		data, err := json.Marshal(response)
-		log.Println(err.Error())
+		if err != nil {
+			log.Info("Error Marshal Response, ", err.Error())
+		}
 
 		w.Write(data)
 		return
 	}
 
 	checkout.ID = vars["id"]
-
+	log.Info("ID : ", vars["id"])
+	log.Info("Fetch Checkout")
 	guest, err := a.FetchData(vars["id"])
 	if err != nil {
-		log.Println(err.Error())
+		log.Info("Error Fetch Data, ", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		response.Status = false
 		response.Message = "Error Checkout Data"
 		response.Code = 187
 
 		data, err := json.Marshal(response)
-		log.Println(err.Error())
+		if err != nil {
+			log.Error("Error Marshal Request, ", err.Error())
+		}
 
 		w.Write(data)
 		return
@@ -91,31 +112,37 @@ func (a *App) Checkout(w http.ResponseWriter, r *http.Request) {
 
 	guest.Close = checkout.Close
 
+	log.Info("Checkout Time: ", checkout.Close)
 	err = a.Delete(vars["id"])
 	if err != nil {
-		log.Println(err.Error())
+		log.Info("Error Deleting Data, ", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		response.Status = false
 		response.Message = "Error Checkout Data"
 		response.Code = 189
 
 		data, err := json.Marshal(response)
-		log.Println(err.Error())
+		if err != nil {
+			log.Info("Error Marshal Request, ", err.Error())
+		}
 
 		w.Write(data)
 		return
 	}
 
+	log.Info("Insert Data Checkout")
 	err = a.Insert(&guest)
 	if err != nil {
-		log.Println(err.Error)
+		log.Info("Error Insert Data, ", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		response.Status = false
 		response.Message = "Error Put Data"
 		response.Code = 176
 
 		data, err := json.Marshal(response)
-		log.Println(err.Error())
+		if err != nil {
+			log.Error("Error Marshal Request, ", err.Error())
+		}
 
 		w.Write(data)
 		return
@@ -127,25 +154,32 @@ func (a *App) Checkout(w http.ResponseWriter, r *http.Request) {
 	response.Data = guest
 
 	res, _ := json.Marshal(response)
+	log.Info("Success Checkout: ", string(res))
 
 	w.Write(res)
-
+	log.Info("Sending Mail")
+	mail.Ctx = a.Ctx
+	mail.Send("out")
+	log.Info("Checkout Success")
 }
 
 func (a *App) Show(w http.ResponseWriter, r *http.Request) {
-	log.Println("Call Method Show...")
+	log.Info("Call Method Show...")
 	w.Header().Add("Content-Type", "application/json")
 	response := ResponseData{}
 	// var guest Guest
 	guest, err := a.getData()
 	if err != nil {
-		log.Println(err.Error())
+		log.Error("Error Get Data: ", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		response.Status = false
 		response.Message = "Error Get Data"
 		response.Code = 104
 
-		errEncode, _ := json.Marshal(response)
+		errEncode, err := json.Marshal(response)
+		if err != nil {
+			log.Error("Error Marshal Request, ", err.Error())
+		}
 
 		w.Write(errEncode)
 		return
@@ -158,21 +192,23 @@ func (a *App) Show(w http.ResponseWriter, r *http.Request) {
 	response.Data = guest
 
 	res, _ := json.Marshal(response)
-
+	log.Info("Success Calling Method")
 	w.Write(res)
 
 }
 
 func (a *App) GetData(w http.ResponseWriter, r *http.Request) {
-	log.Println("Call Method GetData...")
+	log.Info("Call Method GetData...")
 	w.Header().Add("Content-Type", "application/json")
 	vars := mux.Vars(r)
 	response := ResponseData{}
 
+	log.Info("ID : ", vars["id"])
+
 	// Check Data if exists
 	check, _ := a.Redis.HExists(a.CollectionBook, vars["id"]).Result()
 	if !check {
-		log.Println("ID Not exist")
+		log.Error("ID Not exist")
 		w.WriteHeader(http.StatusNotFound)
 		response.Status = false
 		response.Message = "ID Not Found"
@@ -186,7 +222,7 @@ func (a *App) GetData(w http.ResponseWriter, r *http.Request) {
 
 	data, err := a.FetchData(vars["id"])
 	if err != nil {
-		log.Println(err.Error())
+		log.Error("Error Fetch Data: ", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		response.Status = false
 		response.Message = "Error Get Data"
@@ -207,5 +243,5 @@ func (a *App) GetData(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Write(res)
-
+	log.Info("Success Call Method")
 }
