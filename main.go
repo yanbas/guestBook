@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	App "guestBook/app"
 
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/buger/jsonparser"
@@ -77,7 +79,20 @@ func main() {
 	route.HandleFunc("/guest", app.Show).Methods("GET")
 	route.HandleFunc("/guest/{id}", app.GetData).Methods("GET")
 
+	route.Use(middleware)
+
 	log.Info("Running On Port : ", port)
 	http.ListenAndServe(port, route)
 
+}
+
+func middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		correlationId := strings.Replace(uuid.NewV4().String(), "-", "", -1)
+
+		r.Header.Add("correlation_id", correlationId)
+
+		next.ServeHTTP(w, r)
+	})
 }

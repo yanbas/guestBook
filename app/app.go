@@ -166,6 +166,8 @@ func (a *App) Checkout(w http.ResponseWriter, r *http.Request) {
 func (a *App) Show(w http.ResponseWriter, r *http.Request) {
 	log.Info("Call Method Show...")
 	w.Header().Add("Content-Type", "application/json")
+
+	// r.Header.Get("correlation_id")
 	response := ResponseData{}
 	// var guest Guest
 	guest, err := a.getData()
